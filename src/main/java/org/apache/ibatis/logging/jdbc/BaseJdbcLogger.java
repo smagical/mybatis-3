@@ -15,22 +15,16 @@
  */
 package org.apache.ibatis.logging.jdbc;
 
+import org.apache.ibatis.builder.SqlSourceBuilder;
+import org.apache.ibatis.logging.Log;
+import org.apache.ibatis.reflection.ArrayUtil;
+
 import java.lang.reflect.Method;
 import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import org.apache.ibatis.builder.SqlSourceBuilder;
-import org.apache.ibatis.logging.Log;
-import org.apache.ibatis.reflection.ArrayUtil;
 
 /**
  * Base class for proxies to do logging.
@@ -75,9 +69,16 @@ public abstract class BaseJdbcLogger {
   }
 
   protected void setColumn(Object key, Object value) {
-    columnMap.put(key, value);
+    Object tempValue = value;
+    if (tempValue!=null && tempValue instanceof Array){
+      try {
+        tempValue = ((Array)value).getArray();
+      } catch (SQLException e) {
+      }
+    }
+    columnMap.put(key, tempValue);
     columnNames.add(key);
-    columnValues.add(value);
+    columnValues.add(tempValue);
   }
 
   protected Object getColumn(Object key) {
@@ -90,7 +91,10 @@ public abstract class BaseJdbcLogger {
       if (value == null) {
         typeList.add("null");
       } else {
-        typeList.add(objectValueString(value) + "(" + value.getClass().getSimpleName() + ")");
+        typeList.add(objectValueString(value) +
+          "(" + (value.getClass().isArray() ?
+          Array.class.getSimpleName():value.getClass().getSimpleName()) + ")"
+        );
       }
     }
     final String parameters = typeList.toString();
@@ -104,6 +108,8 @@ public abstract class BaseJdbcLogger {
       } catch (SQLException e) {
         // Intentialy fall through to return value.toString()
       }
+    }else if (value.getClass().isArray()){
+      return ArrayUtil.toString(value);
     }
     return value.toString();
   }
